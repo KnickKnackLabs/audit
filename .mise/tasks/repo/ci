@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+#MISE description="Show a repo's CI workflows and their status"
+#USAGE arg "<repo>" help="Repository in owner/name format"
+set -euo pipefail
+
+repo="$usage_repo"
+
+gum style --bold --border double --padding "0 2" --border-foreground 4 \
+  "${repo} — CI"
+echo ""
+
+# List workflows
+workflows=$(gh api "repos/${repo}/actions/workflows" --jq '.workflows[] | [.name, .state, .path] | @csv' 2>/dev/null || true)
+
+if [ -z "$workflows" ]; then
+  gum style --foreground 1 --bold "No workflows found"
+  exit 0
+fi
+
+echo "Name,State,Path" | cat - <(echo "$workflows") | gum table -p --border rounded --border.foreground 8
+echo ""
+
+# Recent runs
+gum style --bold --underline "Recent Runs"
+runs=$(gh run list --repo "$repo" --limit 5 --json name,status,conclusion,headBranch,createdAt \
+  --template '{{range .}}{{.name}},{{.status}},{{.conclusion}},{{.headBranch}},{{timeago .createdAt}}{{"\n"}}{{end}}' 2>/dev/null || true)
+
+if [ -z "$runs" ]; then
+  echo "  (none)"
+else
+  echo "Workflow,Status,Conclusion,Branch,When" | cat - <(echo "$runs") | gum table -p --border rounded --border.foreground 8
+fi

@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+#MISE description="Fetch a repo's logo to a temp file for inspection"
+#USAGE arg "<repo>" help="Repository in owner/name format"
+set -euo pipefail
+
+repo="$usage_repo"
+
+gum style --bold --border double --padding "0 2" --border-foreground 4 \
+  "${repo} — Logo"
+echo ""
+
+found=false
+for filename in logo.svg logo.png icon.svg icon.png; do
+  if ! response=$(gh api "repos/${repo}/contents/${filename}" 2>/dev/null); then
+    continue
+  fi
+  url=$(echo "$response" | jq -r '.download_url // empty')
+  if [ -n "$url" ]; then
+    ext="${filename##*.}"
+    tmp="/tmp/audit-logo-$(echo "$repo" | tr '/' '-').${ext}"
+    curl -sL "$url" -o "$tmp"
+    echo "  Found: ${filename}"
+    echo "  Saved to: ${tmp}"
+    echo "  Size: $(wc -c < "$tmp" | tr -d ' ') bytes"
+    if [ "$ext" = "svg" ]; then
+      echo ""
+      gum style --faint "SVG contents:"
+      head -20 "$tmp"
+    fi
+    found=true
+    break
+  fi
+done
+
+if [ "$found" = false ]; then
+  gum style --foreground 1 --bold "No logo found"
+  gum style --faint "  Checked: logo.svg, logo.png, icon.svg, icon.png"
+fi

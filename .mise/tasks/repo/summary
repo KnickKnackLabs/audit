@@ -1,0 +1,108 @@
+#!/usr/bin/env bash
+#MISE description="Full profile summary of a repo"
+#USAGE arg "<repo>" help="Repository in owner/name format"
+set -euo pipefail
+
+repo="$usage_repo"
+
+# Basic metadata from gh API
+data=$(gh api "repos/${repo}" 2>/dev/null)
+visibility=$(echo "$data" | jq -r '.visibility')
+stars=$(echo "$data" | jq -r '.stargazers_count')
+forks=$(echo "$data" | jq -r '.forks_count')
+description=$(echo "$data" | jq -r 'if .description != "" and .description != null then .description else "—" end')
+language=$(echo "$data" | jq -r '.language // "—"')
+created=$(echo "$data" | jq -r '.created_at[:10]')
+
+# Header
+gum style --bold --border double --padding "0 2" --border-foreground 4 \
+  "${repo}"
+echo ""
+gum style --faint "  ${description}"
+echo ""
+
+# Overview table
+overview="Metric,Value
+Visibility,${visibility}
+Language,${language}
+Created,${created}
+Stars,${stars}
+Forks,${forks}"
+
+# Metrics
+metrics=$(mise run -q repo:metrics "$repo")
+contributors=$(echo "$metrics" | grep 'contributors:' | cut -d' ' -f2)
+total_commits=$(echo "$metrics" | grep 'total_commits:' | cut -d' ' -f2)
+first_commit=$(echo "$metrics" | grep 'first_commit:' | cut -d' ' -f2 | cut -dT -f1)
+last_commit=$(echo "$metrics" | grep 'last_commit:' | cut -d' ' -f2 | cut -dT -f1)
+
+overview="${overview}
+Contributors,${contributors}
+Total Commits,${total_commits}
+First Commit,${first_commit}
+Last Commit,${last_commit}"
+
+gum style --bold --underline "Overview"
+echo "$overview" | gum table -p --border rounded --border.foreground 8
+echo ""
+
+# Files table
+gum style --bold --underline "Files"
+files_csv="File,Status"
+while IFS= read -r line; do
+  if [[ "$line" == ✓* ]]; then
+    file="${line#✓ }"
+    files_csv="${files_csv}
+${file},✅"
+  elif [[ "$line" == ✗* ]]; then
+    file="${line#✗ }"
+    files_csv="${files_csv}
+${file},❌"
+  fi
+done < <(mise run -q repo:files "$repo")
+echo "$files_csv" | gum table -p --border rounded --border.foreground 8
+echo ""
+
+# Social table
+gum style --bold --underline "Social"
+social_csv="Check,Status"
+while IFS= read -r line; do
+  key=$(echo "$line" | cut -d: -f1)
+  val=$(echo "$line" | cut -d: -f2- | sed 's/^ //')
+  case "$key" in
+    social_preview) continue ;; # skip, not machine-checkable
+    *)
+      if [[ "$val" == ✓* ]]; then
+        social_csv="${social_csv}
+${key},✅ ${val#✓}"
+      elif [[ "$val" == ✗* ]]; then
+        social_csv="${social_csv}
+${key},❌"
+      else
+        social_csv="${social_csv}
+${key},${val}"
+      fi
+      ;;
+  esac
+done < <(mise run -q repo:social "$repo")
+echo "$social_csv" | gum table -p --border rounded --border.foreground 8
+echo ""
+
+# Activity
+gum style --bold --underline "Activity"
+activity=$(mise run -q repo:activity "$repo")
+prs=$(echo "$activity" | sed -n '/=== Open PRs ===/,/=== Open Issues ===/{ /===/d; p; }' | sed '/^$/d')
+issues=$(echo "$activity" | sed -n '/=== Open Issues ===/,$ { /===/d; p; }' | sed '/^$/d')
+
+pr_count=$(echo "$prs" | grep -c '#' || true)
+issue_count=$(echo "$issues" | grep -c '#' || true)
+
+echo "  PRs: ${pr_count} open | Issues: ${issue_count} open"
+if [ -n "$prs" ]; then
+  echo ""
+  echo "$prs" | head -5 | sed 's/^/  /'
+fi
+if [ -n "$issues" ]; then
+  echo ""
+  echo "$issues" | head -5 | sed 's/^/  /'
+fi

@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+#MISE description="Check social/community features of a repo"
+#USAGE arg "<repo>" help="Repository in owner/name format"
+set -euo pipefail
+
+repo="$usage_repo"
+
+# Get repo details including social preview
+data=$(gh api "repos/${repo}" 2>/dev/null)
+
+has_description=$(echo "$data" | jq -r 'if .description != "" and .description != null then "✓" else "✗" end')
+has_homepage=$(echo "$data" | jq -r 'if .homepage != "" and .homepage != null then "✓" else "✗" end')
+has_topics=$(echo "$data" | jq -r 'if (.topics | length) > 0 then "✓ (" + (.topics | join(", ")) + ")" else "✗" end')
+open_issues=$(echo "$data" | jq -r '.open_issues_count')
+has_pages=$(echo "$data" | jq -r 'if .has_pages then "✓" else "✗" end')
+
+echo "description: ${has_description}"
+echo "homepage: ${has_homepage}"
+echo "topics: ${has_topics}"
+echo "open_issues: ${open_issues}"
+echo "github_pages: ${has_pages}"
+
+# Check for social preview (custom OG image)
+# The API doesn't directly expose this, but we can check the media endpoint
+social_url="https://opengraph.githubassets.com/1/${repo}"
+echo "social_preview: (check manually — no API for custom vs default)"

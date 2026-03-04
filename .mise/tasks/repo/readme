@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+#MISE description="Fetch and display a repo's README"
+#USAGE arg "<repo>" help="Repository in owner/name format"
+set -euo pipefail
+
+repo="$usage_repo"
+
+content=$(gh api "repos/${repo}/readme" --jq '.content' 2>/dev/null | base64 -d 2>/dev/null)
+
+if [ -z "$content" ]; then
+  gum style --foreground 1 --bold "No README found"
+  exit 0
+fi
+
+gum style --bold --border double --padding "0 2" --border-foreground 4 \
+  "${repo} — README.md"
+echo ""
+echo "$content" | gum format

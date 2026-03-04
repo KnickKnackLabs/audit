@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+#MISE description="Get recent issues and PRs for a repo"
+#USAGE arg "<repo>" help="Repository in owner/name format"
+#USAGE flag "-n --limit <limit>" help="Number of items to show" default="10"
+set -euo pipefail
+
+repo="$usage_repo"
+limit="${usage_limit:-10}"
+
+echo "=== Open PRs ==="
+gh pr list --repo "$repo" --limit "$limit" --json number,title,author,createdAt,updatedAt \
+  --template '{{range .}}#{{.number}} {{.title}} (by {{.author.login}}, {{timeago .updatedAt}}){{"\n"}}{{end}}' 2>/dev/null || echo "(none or no access)"
+
+echo ""
+echo "=== Open Issues ==="
+gh issue list --repo "$repo" --limit "$limit" --json number,title,author,createdAt,updatedAt \
+  --template '{{range .}}#{{.number}} {{.title}} (by {{.author.login}}, {{timeago .updatedAt}}){{"\n"}}{{end}}' 2>/dev/null || echo "(none or no access)"

@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+#MISE description="Check for key files in a repo"
+#USAGE arg "<repo>" help="Repository in owner/name format"
+set -euo pipefail
+
+repo="$usage_repo"
+
+# Files we care about
+files=(
+  README.md
+  LICENSE
+  CLAUDE.md
+  .mise.toml
+  .mise/tasks
+  .github/workflows
+  CONTRIBUTING.md
+  logo.png
+  logo.svg
+)
+
+for f in "${files[@]}"; do
+  # gh api returns 0 for files, non-zero for not found
+  # For directories, we check the contents endpoint
+  if gh api "repos/${repo}/contents/${f}" --silent 2>/dev/null; then
+    echo "✓ ${f}"
+  else
+    echo "✗ ${f}"
+  fi
+done

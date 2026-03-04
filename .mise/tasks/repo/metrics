@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+#MISE description="Get commit/contributor metrics for a repo"
+#USAGE arg "<repo>" help="Repository in owner/name format"
+set -euo pipefail
+
+repo="$usage_repo"
+
+# Helper: extract last page number from Link header
+last_page() {
+  grep -i 'link:' | sed -n 's/.*&page=\([0-9]*\)>; rel="last".*/\1/p'
+}
+
+# Contributor count
+contrib_headers=$(gh api "repos/${repo}/contributors?per_page=1&anon=true" -i 2>/dev/null)
+contributors=$(echo "$contrib_headers" | last_page)
+if [ -z "$contributors" ]; then
+  contributors=$(gh api "repos/${repo}/contributors?anon=true" 2>/dev/null | jq 'length')
+fi
+echo "contributors: ${contributors}"
+
+# Total commits (from pagination on commits endpoint)
+commit_headers=$(gh api "repos/${repo}/commits?per_page=1" -i 2>/dev/null)
+total_commits=$(echo "$commit_headers" | last_page)
+if [ -z "$total_commits" ]; then
+  total_commits=1
+fi
+echo "total_commits: ~${total_commits}"
+
+# First commit (oldest) — fetch the last page
+first_commit_data=$(gh api "repos/${repo}/commits?per_page=1&page=${total_commits}" 2>/dev/null)
+first_date=$(echo "$first_commit_data" | jq -r '.[0].commit.committer.date // "unknown"')
+echo "first_commit: ${first_date}"
+
+# Last commit (most recent)
+last_commit_data=$(gh api "repos/${repo}/commits?per_page=1" 2>/dev/null)
+last_date=$(echo "$last_commit_data" | jq -r '.[0].commit.committer.date // "unknown"')
+echo "last_commit: ${last_date}"

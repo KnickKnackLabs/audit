@@ -1,0 +1,6 @@
+[tasks]
+
+[tools]
+gum = "latest"
+# Repo audit tooling - low-level primitives for inspecting repos
+# See: https://github.com/ricon-family/or/issues/45

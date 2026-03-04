@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+#MISE description="Show a repo's GitHub description, topics, and homepage"
+#USAGE arg "<repo>" help="Repository in owner/name format"
+set -euo pipefail
+
+repo="$usage_repo"
+
+data=$(gh api "repos/${repo}" 2>/dev/null)
+
+description=$(echo "$data" | jq -r 'if .description != "" and .description != null then .description else "—" end')
+homepage=$(echo "$data" | jq -r 'if .homepage != "" and .homepage != null then .homepage else "—" end')
+topics=$(echo "$data" | jq -r 'if (.topics | length) > 0 then (.topics | join(", ")) else "—" end')
+
+gum style --bold --border double --padding "0 2" --border-foreground 4 \
+  "${repo} — Description & Metadata"
+echo ""
+
+echo "Description,${description}
+Homepage,${homepage}
+Topics,${topics}" | gum table -p --border rounded --border.foreground 8

@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+#MISE description="Fetch and display a repo's license"
+#USAGE arg "<repo>" help="Repository in owner/name format"
+set -euo pipefail
+
+repo="$usage_repo"
+
+# First check the API's detected license
+license_info=$(gh api "repos/${repo}" --jq '.license // empty' 2>/dev/null || true)
+if [ -z "$license_info" ] || [ "$license_info" = "null" ]; then
+  license_key="none"
+  license_name="None detected"
+else
+  license_key=$(echo "$license_info" | jq -r '.key // "none"')
+  license_name=$(echo "$license_info" | jq -r '.name // "None detected"')
+fi
+
+gum style --bold --border double --padding "0 2" --border-foreground 4 \
+  "${repo} — License"
+echo ""
+
+if [ "$license_key" = "none" ] || [ "$license_key" = "null" ]; then
+  gum style --foreground 1 --bold "No license detected by GitHub"
+  echo ""
+  # Still try to fetch the file — might exist but be unrecognized
+  content=$(gh api "repos/${repo}/contents/LICENSE" --jq '.content' 2>/dev/null | base64 -d 2>/dev/null || true)
+  if [ -n "$content" ]; then
+    gum style --foreground 3 "LICENSE file exists but GitHub didn't recognize it:"
+    echo ""
+    echo "$content"
+  fi
+else
+  gum style --bold "Detected: ${license_name} (${license_key})"
+  echo ""
+  content=$(gh api "repos/${repo}/license" --jq '.content' 2>/dev/null | base64 -d 2>/dev/null || true)
+  if [ -n "$content" ]; then
+    echo "$content"
+  fi
+fi
